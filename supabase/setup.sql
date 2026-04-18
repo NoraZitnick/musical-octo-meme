@@ -28,6 +28,25 @@ create table if not exists public.clubs (
   created_at timestamptz not null default now()
 );
 
+-- Force created_by from auth context so clients cannot spoof it and RLS stays reliable.
+create or replace function public.set_club_creator()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.created_by := auth.uid();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_set_club_creator on public.clubs;
+create trigger trg_set_club_creator
+before insert on public.clubs
+for each row
+execute function public.set_club_creator();
+
 create table if not exists public.memberships (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -134,7 +153,7 @@ using (public.is_club_member(id));
 drop policy if exists "clubs admin insert" on public.clubs;
 create policy "clubs admin insert" on public.clubs
 for insert to authenticated
-with check (created_by = auth.uid());
+with check (auth.uid() is not null and created_by = auth.uid());
 
 drop policy if exists "clubs admin update" on public.clubs;
 create policy "clubs admin update" on public.clubs

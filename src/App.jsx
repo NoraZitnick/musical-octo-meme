@@ -397,7 +397,6 @@ function CreateClubPage() {
         description: form.description,
         meeting_times: form.meeting_times,
         school_id: form.school_id,
-        created_by: currentUserId,
       })
       .select("id")
       .single();
