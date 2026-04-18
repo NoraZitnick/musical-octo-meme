@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { ATTENDANCE_OPTIONS, US_STATES } from "./constants";
@@ -230,10 +230,22 @@ function DashboardPage() {
   const [memberClubs, setMemberClubs] = useState([]);
   const [adminClubs, setAdminClubs] = useState([]);
   const [newClubOpen, setNewClubOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [completeForm, setCompleteForm] = useState({ schoolName: "", town: "", state: "", grade: "" });
   const [savingProfile, setSavingProfile] = useState(false);
   const { toast, notify, clear } = useToast();
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(event.target)) {
+        setNewClubOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function loadDashboard() {
     const userId = session.user.id;
@@ -307,6 +319,23 @@ function DashboardPage() {
   return (
     <Page>
       <div className="card">
+        <div className="card-topbar">
+          <div
+            className="dropdown"
+            ref={dropdownRef}
+            onMouseLeave={() => setNewClubOpen(false)}
+          >
+            <button className="btn" onClick={() => setNewClubOpen((v) => !v)}>
+              Add Clubs
+            </button>
+            {newClubOpen && (
+              <div className="dropdown-menu">
+                <Link className="dropdown-item" to="/create-club">Make a Club</Link>
+                <Link className="dropdown-item" to="/join-club">Join a Club</Link>
+              </div>
+            )}
+          </div>
+        </div>
         <h2>Dashboard</h2>
         <p>Welcome to your club planning workspace.</p>
         {!profile?.school_id && (
@@ -343,13 +372,6 @@ function DashboardPage() {
             ))}
           </div>
         </div>
-        <button className="btn" onClick={() => setNewClubOpen((v) => !v)}>Add New Club</button>
-        {newClubOpen && (
-          <div className="switch-row">
-            <Link className="btn secondary" to="/create-club">Make a Club</Link>
-            <Link className="btn secondary" to="/join-club">Join a Club</Link>
-          </div>
-        )}
         <Toast type={toast?.type} message={toast?.message} onClose={clear} />
       </div>
     </Page>

@@ -117,6 +117,46 @@ textarea {
   margin: 0.8rem 0;
 }
 
+.card-topbar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.1);
+  min-width: 180px;
+  z-index: 10;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  display: block;
+  color: #111827;
+  text-decoration: none;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #f9fafb;
+}
+
 .split {
   display: grid;
   gap: 1rem;

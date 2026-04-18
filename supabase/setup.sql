@@ -94,6 +94,8 @@ create or replace function public.is_club_admin(p_club_id uuid)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1 from public.memberships m
@@ -107,6 +109,8 @@ create or replace function public.is_club_member(p_club_id uuid)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1 from public.memberships m
