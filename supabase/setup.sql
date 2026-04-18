@@ -70,8 +70,13 @@ create table if not exists public.events (
   name text not null,
   date timestamptz not null,
   location text not null,
+  duration_minutes integer not null default 60 check (duration_minutes > 0),
   created_at timestamptz not null default now()
 );
+
+alter table public.events add column if not exists duration_minutes integer not null default 60;
+alter table public.events drop constraint if exists events_duration_minutes_check;
+alter table public.events add constraint events_duration_minutes_check check (duration_minutes > 0);
 
 create table if not exists public.attendance (
   id uuid primary key default gen_random_uuid(),
@@ -233,11 +238,19 @@ create policy "events admin delete" on public.events
 for delete to authenticated
 using (public.is_club_admin(club_id));
 
--- Attendance: users can only control their own attendance.
+-- Attendance: users can manage their own attendance and club peers can read roster responses.
 drop policy if exists "attendance self read" on public.attendance;
 create policy "attendance self read" on public.attendance
 for select to authenticated
-using (user_id = auth.uid());
+using (
+  user_id = auth.uid()
+  or exists (
+    select 1
+    from public.events e
+    where e.id = attendance.event_id
+      and public.is_club_member(e.club_id)
+  )
+);
 
 drop policy if exists "attendance self insert" on public.attendance;
 create policy "attendance self insert" on public.attendance
