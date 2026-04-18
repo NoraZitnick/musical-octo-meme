@@ -12,9 +12,9 @@
   --text-soft: #667085;
   --danger: #b42318;
   --shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
-  --radius-lg: 24px;
-  --radius-md: 16px;
-  --radius-sm: 12px;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -87,6 +87,24 @@ textarea {
 .app-shell {
   min-height: 100vh;
   padding: var(--space-4) var(--space-2);
+}
+
+.app-shell--hero {
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.48), rgba(15, 23, 42, 0.48)),
+    url("https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1800&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+.app-shell--hero .page-header__text h1,
+.app-shell--hero .page-header__text p {
+  color: #ffffff;
+}
+
+.app-shell--hero .surface {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
 }
 
 .page-frame {
@@ -233,7 +251,7 @@ textarea {
   gap: var(--space-1);
   min-height: 44px;
   padding: 0 var(--space-2);
-  border-radius: 999px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: var(--primary);
   color: #ffffff;
@@ -267,7 +285,7 @@ textarea {
   gap: var(--space-1);
   padding: var(--space-1);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--surface-subtle);
 }
 
@@ -275,7 +293,7 @@ textarea {
   min-height: 40px;
   padding: 0 var(--space-2);
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   font-weight: 600;

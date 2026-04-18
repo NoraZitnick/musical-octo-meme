@@ -4,11 +4,11 @@ import { supabase } from "./lib/supabase";
 import { ATTENDANCE_OPTIONS, US_STATES } from "./constants";
 import { normalizeSchoolName, normalizeTown, stateOrEmpty, toLocalDateTimeInput } from "./utils";
 
-function Page({ children, title, description, actions, width = "wide", showBack = true }) {
+function Page({ children, title, description, actions, width = "wide", showBack = true, heroImage = false }) {
   const navigate = useNavigate();
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${heroImage ? " app-shell--hero" : ""}`}>
       <div className={`page-frame page-frame--${width}`}>
         <header className="page-header">
           <div className="page-header__copy">
@@ -235,6 +235,7 @@ function HomePage() {
       title="Run club operations from one clean workspace."
       description="Create clubs, publish events, manage members, and track attendance with a focused workflow."
       showBack={false}
+      heroImage
       actions={
         <>
           <Link className="button button--ghost" to="/login?mode=login">Log in</Link>
@@ -545,7 +546,7 @@ function DashboardPage() {
   return (
     <Page
       title="Dashboard"
-      description="Manage clubs, keep your profile current, and jump into the next action quickly."
+      description={null}
       actions={
         <>
           <Link className="button button--ghost" to="/join-club">Join club</Link>
@@ -557,7 +558,7 @@ function DashboardPage() {
         <Surface>
           <SectionHeader
             title="Profile"
-            meta={profileComplete ? "Your account is ready for club management." : "Complete your profile to unlock the full workflow."}
+            meta={null}
             action={
               !showProfileForm && (
                 <button type="button" className={profileComplete ? "button button--ghost" : "button"} onClick={profileComplete ? openEditProfile : openCompleteProfile}>
@@ -600,16 +601,8 @@ function DashboardPage() {
           ) : (
             <div className="detail-list">
               <div className="detail-row">
-                <span>Username</span>
+                <span>Name</span>
                 <strong>{profile?.username || "Not set"}</strong>
-              </div>
-              <div className="detail-row">
-                <span>School</span>
-                <strong>{profile?.school ? `${profile.school.name}, ${profile.school.town}, ${profile.school.state}` : "Not set"}</strong>
-              </div>
-              <div className="detail-row">
-                <span>Grade</span>
-                <strong>{profile?.grade || "Not set"}</strong>
               </div>
             </div>
           )}
@@ -1301,27 +1294,6 @@ function ClubAdminPage() {
         </Surface>
 
         <Surface>
-          <SectionHeader title="Members" meta={`${members.length} people in this club`} />
-          <div className="stack-sm">
-            {members.map((member) => (
-              <div key={member.id} className="detail-row detail-row--interactive">
-                <div>
-                  <strong>{member.user?.username || member.user?.email || member.user_id}</strong>
-                  <p>{member.role}</p>
-                </div>
-                {member.role !== "admin" ? (
-                  <button className="button button--ghost" onClick={() => promote(member.id)} disabled={promotingId === member.id}>
-                    {promotingId === member.id ? "Promoting..." : "Make admin"}
-                  </button>
-                ) : (
-                  <span className="pill">Admin</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </Surface>
-
-        <Surface>
           <SectionHeader title="Active events" meta={events.length ? `${events.length} events visible to members` : "No active events"} />
           {events.length === 0 ? (
             <EmptyState title="No active events" description="Add an event to give members something to respond to." />
@@ -1389,6 +1361,27 @@ function ClubAdminPage() {
               ))}
             </div>
           )}
+        </Surface>
+
+        <Surface>
+          <SectionHeader title="Members" meta={`${members.length} people in this club`} />
+          <div className="stack-sm">
+            {members.map((member) => (
+              <div key={member.id} className="detail-row detail-row--interactive">
+                <div>
+                  <strong>{member.user?.username || member.user?.email || member.user_id}</strong>
+                  <p>{member.role}</p>
+                </div>
+                {member.role !== "admin" ? (
+                  <button className="button button--ghost" onClick={() => promote(member.id)} disabled={promotingId === member.id}>
+                    {promotingId === member.id ? "Promoting..." : "Make admin"}
+                  </button>
+                ) : (
+                  <span className="pill">Admin</span>
+                )}
+              </div>
+            ))}
+          </div>
         </Surface>
 
         <Toast type={toast?.type} message={toast?.message} onClose={clear} />
