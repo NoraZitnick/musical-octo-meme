@@ -414,7 +414,7 @@ function DashboardPage() {
         )}
         {profile?.school_id && profile?.grade && (profile?.username || "").trim() && (
           <button type="button" className="btn secondary" onClick={toggleEditProfile}>
-            {showProfileForm ? "Close profile editor" : "Edit profile"}
+            Edit profile
           </button>
         )}
 
@@ -723,6 +723,7 @@ function ClubAdminPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { session } = useAuthState();
+  const [club, setClub] = useState(null);
   const [events, setEvents] = useState([]);
   const [members, setMembers] = useState([]);
   const [eventForm, setEventForm] = useState({ name: "", date: "", location: "" });
@@ -751,14 +752,16 @@ function ClubAdminPage() {
       return;
     }
 
-    const [{ data: eventRows }, { data: memberRows }, { data: attendanceRows }] = await Promise.all([
+    const [{ data: clubRow }, { data: eventRows }, { data: memberRows }, { data: attendanceRows }] = await Promise.all([
+      supabase.from("clubs").select("name, description").eq("id", id).maybeSingle(),
       supabase.from("events").select("id, name, date, location").eq("club_id", id).order("date"),
       supabase
         .from("memberships")
-        .select("id, role, user_id, user:users(username,email)")
+        .select("id, role, user_id, user:users!memberships_user_id_fkey(username,email)")
         .eq("club_id", id),
       supabase.from("attendance").select("event_id, status").eq("user_id", session.user.id),
     ]);
+    setClub(clubRow || null);
     setEvents(eventRows || []);
     setMembers(memberRows || []);
     const map = {};
@@ -875,7 +878,8 @@ function ClubAdminPage() {
   return (
     <Page>
       <div className="card">
-        <h2>Club Admin</h2>
+        <h2>{club?.name || "Club Admin"}</h2>
+        {club?.description && <p>{club.description}</p>}
         <div className="split">
           <section>
             <h3>Schedule events or meetings</h3>
