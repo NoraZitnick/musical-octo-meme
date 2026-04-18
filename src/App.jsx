@@ -126,14 +126,6 @@ function AuthPage() {
 
   const update = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  async function signWithGoogle() {
-    const origin = window.location.origin;
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${origin}/dashboard` },
-    });
-  }
-
   async function onSubmit(e) {
     e.preventDefault();
     setLoading(true);
@@ -151,7 +143,7 @@ function AuthPage() {
           password: form.password,
         });
         if (signUpErr) throw signUpErr;
-        if (data.user) {
+        if (data.user && data.session) {
           await upsertSchoolAndProfile(
             data.user.id,
             form.email.trim(),
@@ -160,6 +152,10 @@ function AuthPage() {
             form.state,
             form.grade
           );
+        } else if (data.user && !data.session) {
+          notify("info", "Check your email to verify your account, then log in to complete your profile.");
+          navigate("/login?mode=login");
+          return;
         }
       }
       notify("success", mode === "signup" ? "Account created. Redirecting to dashboard." : "Login successful.");
@@ -198,9 +194,6 @@ function AuthPage() {
           )}
           <button className="btn" disabled={loading}>{loading ? "Working..." : mode === "signup" ? "Create account" : "Login"}</button>
         </form>
-        <button className="btn secondary" onClick={signWithGoogle}>
-          {mode === "signup" ? "Sign up with Google" : "Sign in with Google"}
-        </button>
         {error && <p className="error">{error}</p>}
         <Toast type={toast?.type} message={toast?.message} onClose={clear} />
       </div>
