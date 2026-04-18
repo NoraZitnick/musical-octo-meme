@@ -51,10 +51,15 @@ function useToast() {
   };
 }
 
-async function upsertSchoolAndProfile(userId, email, schoolName, town, state, grade) {
+function normalizeUsername(value) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+async function upsertSchoolAndProfile(userId, email, username, schoolName, town, state, grade) {
   const normalizedSchool = normalizeSchoolName(schoolName);
   const normalizedTown = normalizeTown(town);
   const normalizedState = stateOrEmpty(state);
+  const uname = username != null ? normalizeUsername(username) : null;
 
   const { data: existingSchool } = await supabase
     .from("schools")
@@ -79,13 +84,23 @@ async function upsertSchoolAndProfile(userId, email, schoolName, town, state, gr
     schoolId = createdSchool.id;
   }
 
-  const { error: profileErr } = await supabase.from("users").upsert({
+  const profilePayload = {
     id: userId,
     email,
     school_id: schoolId,
     grade: Number(grade),
-  });
+  };
+  if (uname) profilePayload.username = uname;
+
+  const { error: profileErr } = await supabase.from("users").upsert(profilePayload);
   if (profileErr) throw profileErr;
+}
+
+async function markClubSeen(userId, clubId) {
+  await supabase.from("club_event_reads").upsert(
+    { user_id: userId, club_id: clubId, last_seen_at: new Date().toISOString() },
+    { onConflict: "user_id,club_id" }
+  );
 }
 
 function HomePage() {
@@ -115,6 +130,7 @@ function AuthPage() {
   const [form, setForm] = useState({
     email: "",
     password: "",
+    username: "",
     schoolName: "",
     town: "",
     state: "",
@@ -147,6 +163,7 @@ function AuthPage() {
           await upsertSchoolAndProfile(
             data.user.id,
             form.email.trim(),
+            form.username,
             form.schoolName,
             form.town,
             form.state,
@@ -181,6 +198,7 @@ function AuthPage() {
           <label>Password<input required name="password" type="password" minLength={8} value={form.password} onChange={update} /></label>
           {mode === "signup" && (
             <>
+              <label>Username<input required name="username" autoComplete="username" value={form.username} onChange={update} /></label>
               <label>School<input required name="schoolName" value={form.schoolName} onChange={update} /></label>
               <label>Town<input required name="town" value={form.town} onChange={update} /></label>
               <label>State
@@ -232,7 +250,8 @@ function DashboardPage() {
   const [newClubOpen, setNewClubOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [profile, setProfile] = useState(null);
-  const [completeForm, setCompleteForm] = useState({ schoolName: "", town: "", state: "", grade: "" });
+  const [showProfileForm, setShowProfileForm] = useState(false);
+  const [completeForm, setCompleteForm] = useState({ username: "", schoolName: "", town: "", state: "", grade: "" });
   const [savingProfile, setSavingProfile] = useState(false);
   const { toast, notify, clear } = useToast();
 
@@ -254,7 +273,11 @@ function DashboardPage() {
         .from("memberships")
         .select("role, club:clubs(id, name, description, meeting_times, school_id, created_at)")
         .eq("user_id", userId),
-      supabase.from("users").select("id, grade, school_id").eq("id", userId).maybeSingle(),
+      supabase
+        .from("users")
+        .select("id, username, grade, school_id, school:schools(name, town, state)")
+        .eq("id", userId)
+        .maybeSingle(),
     ]);
 
     setProfile(profileRow);
@@ -294,6 +317,33 @@ function DashboardPage() {
     if (session?.user) loadDashboard();
   }, [session?.user?.id]);
 
+  function openCompleteProfile() {
+    setCompleteForm({
+      username: profile?.username || "",
+      schoolName: "",
+      town: "",
+      state: "",
+      grade: profile?.grade != null ? String(profile.grade) : "",
+    });
+    setShowProfileForm(true);
+  }
+
+  function toggleEditProfile() {
+    if (showProfileForm) {
+      setShowProfileForm(false);
+      return;
+    }
+    const sch = profile?.school;
+    setCompleteForm({
+      username: profile?.username || "",
+      schoolName: sch?.name || "",
+      town: sch?.town || "",
+      state: sch?.state || "",
+      grade: profile?.grade != null ? String(profile.grade) : "",
+    });
+    setShowProfileForm(true);
+  }
+
   async function completeProfile(e) {
     e.preventDefault();
     if (savingProfile) return;
@@ -302,6 +352,7 @@ function DashboardPage() {
       await upsertSchoolAndProfile(
         session.user.id,
         session.user.email,
+        completeForm.username,
         completeForm.schoolName,
         completeForm.town,
         completeForm.state,
@@ -309,6 +360,7 @@ function DashboardPage() {
       );
       await loadDashboard();
       notify("success", "Profile saved.");
+      setShowProfileForm(false);
     } catch (err) {
       notify("error", err.message || "Could not save profile.");
     } finally {
@@ -323,7 +375,6 @@ function DashboardPage() {
           <div
             className="dropdown"
             ref={dropdownRef}
-            onMouseLeave={() => setNewClubOpen(false)}
           >
             <button className="btn" onClick={() => setNewClubOpen((v) => !v)}>
               Add Clubs
@@ -338,9 +389,16 @@ function DashboardPage() {
         </div>
         <h2>Dashboard</h2>
         <p>Welcome to your club planning workspace.</p>
-        {!profile?.school_id && (
+        {(!profile?.school_id || !profile?.grade || !(profile?.username || "").trim()) && !showProfileForm && (
+          <p className="profile-hint">
+            Your profile is incomplete.
+            <button type="button" className="btn secondary profile-hint-btn" onClick={openCompleteProfile}>Complete profile</button>
+          </p>
+        )}
+        {showProfileForm && (
           <form className="form inline-form" onSubmit={completeProfile}>
-            <h3>Complete your profile</h3>
+            <h3>Your profile</h3>
+            <label>Username<input required value={completeForm.username} onChange={(e) => setCompleteForm((p) => ({ ...p, username: e.target.value }))} /></label>
             <label>School<input required value={completeForm.schoolName} onChange={(e) => setCompleteForm((p) => ({ ...p, schoolName: e.target.value }))} /></label>
             <label>Town<input required value={completeForm.town} onChange={(e) => setCompleteForm((p) => ({ ...p, town: e.target.value }))} /></label>
             <label>State
@@ -351,7 +409,13 @@ function DashboardPage() {
             </label>
             <label>Grade<input required type="number" min="1" max="12" value={completeForm.grade} onChange={(e) => setCompleteForm((p) => ({ ...p, grade: e.target.value }))} /></label>
             <button className="btn" disabled={savingProfile}>{savingProfile ? "Saving..." : "Save profile"}</button>
+            <button type="button" className="btn secondary" onClick={() => setShowProfileForm(false)}>Cancel</button>
           </form>
+        )}
+        {profile?.school_id && profile?.grade && (profile?.username || "").trim() && (
+          <button type="button" className="btn secondary" onClick={toggleEditProfile}>
+            {showProfileForm ? "Close profile editor" : "Edit profile"}
+          </button>
         )}
 
         <div className="split">
@@ -559,34 +623,48 @@ function JoinClubPage() {
 function ClubPage() {
   const { id } = useParams();
   const { session } = useAuthState();
+  const [club, setClub] = useState(null);
   const [events, setEvents] = useState([]);
   const [attendanceMap, setAttendanceMap] = useState({});
   const [updatingAttendanceId, setUpdatingAttendanceId] = useState(null);
   const { toast, notify, clear } = useToast();
 
   async function load() {
-    const [{ data: eventRows }, { data: attendanceRows }] = await Promise.all([
+    const [{ data: clubRow, error: clubErr }, { data: eventRows, error: eventErr }, { data: attendanceRows, error: attendanceErr }] = await Promise.all([
+      supabase.from("clubs").select("name, description, meeting_times").eq("id", id).maybeSingle(),
       supabase.from("events").select("id, name, date, location").eq("club_id", id).order("date"),
       supabase
         .from("attendance")
         .select("event_id, status")
         .eq("user_id", session.user.id),
     ]);
+    if (clubErr) {
+      notify("error", clubErr.message || "Could not load club.");
+      setClub(null);
+    } else {
+      setClub(clubRow);
+    }
+    if (eventErr) {
+      notify("error", eventErr.message || "Could not load events.");
+      setEvents([]);
+      return;
+    }
+    if (attendanceErr) {
+      notify("error", attendanceErr.message || "Could not load attendance.");
+      setAttendanceMap({});
+      return;
+    }
     setEvents(eventRows || []);
     const map = {};
     (attendanceRows || []).forEach((r) => {
       map[r.event_id] = r.status;
     });
     setAttendanceMap(map);
+    await markClubSeen(session.user.id, id);
   }
 
   useEffect(() => {
     if (session?.user) load();
-  }, [id, session?.user?.id]);
-
-  useEffect(() => {
-    if (!session?.user) return;
-    supabase.from("club_event_reads").upsert({ user_id: session.user.id, club_id: id, last_seen_at: new Date().toISOString() });
   }, [id, session?.user?.id]);
 
   async function setAttendance(eventId, status) {
@@ -594,11 +672,14 @@ function ClubPage() {
     const previous = attendanceMap[eventId] || "maybe";
     setUpdatingAttendanceId(eventId);
     setAttendanceMap((prev) => ({ ...prev, [eventId]: status }));
-    const { error } = await supabase.from("attendance").upsert({
-      user_id: session.user.id,
-      event_id: eventId,
-      status,
-    });
+    const { error } = await supabase.from("attendance").upsert(
+      {
+        user_id: session.user.id,
+        event_id: eventId,
+        status,
+      },
+      { onConflict: "user_id,event_id" }
+    );
     if (error) {
       setAttendanceMap((prev) => ({ ...prev, [eventId]: previous }));
       notify("error", error.message || "Could not update attendance.");
@@ -612,7 +693,11 @@ function ClubPage() {
   return (
     <Page>
       <div className="card">
-        <h2>Club Events</h2>
+        <header className="club-header">
+          <h2>{club?.name || "Club"}</h2>
+          {club?.description ? <p className="club-description">{club.description}</p> : null}
+        </header>
+        <h3 className="section-title">Events</h3>
         {events.map((event) => (
           <div key={event.id} className="card small">
             <h3>{event.name}</h3>
@@ -648,6 +733,7 @@ function ClubAdminPage() {
   const [updatingEventId, setUpdatingEventId] = useState(null);
   const [promotingId, setPromotingId] = useState(null);
   const [updatingAttendanceId, setUpdatingAttendanceId] = useState(null);
+  const [deletingEventId, setDeletingEventId] = useState(null);
   const { toast, notify, clear } = useToast();
 
   const isValid = useMemo(() => eventForm.name && eventForm.date && eventForm.location, [eventForm]);
@@ -669,7 +755,7 @@ function ClubAdminPage() {
       supabase.from("events").select("id, name, date, location").eq("club_id", id).order("date"),
       supabase
         .from("memberships")
-        .select("id, role, user_id, user:users(email)")
+        .select("id, role, user_id, user:users(username,email)")
         .eq("club_id", id),
       supabase.from("attendance").select("event_id, status").eq("user_id", session.user.id),
     ]);
@@ -680,17 +766,13 @@ function ClubAdminPage() {
       map[row.event_id] = row.status;
     });
     setAttendanceMap(map);
+    await markClubSeen(session.user.id, id);
     setAccessChecked(true);
     setPageLoading(false);
   }
 
   useEffect(() => {
     if (session?.user) load();
-  }, [id, session?.user?.id]);
-
-  useEffect(() => {
-    if (!session?.user) return;
-    supabase.from("club_event_reads").upsert({ user_id: session.user.id, club_id: id, last_seen_at: new Date().toISOString() });
   }, [id, session?.user?.id]);
 
   async function addEvent() {
@@ -727,6 +809,26 @@ function ClubAdminPage() {
     setUpdatingEventId(null);
   }
 
+  async function deleteEvent(eventId) {
+    if (deletingEventId === eventId) return;
+    if (!window.confirm("Delete this event? Attendance for it will be removed.")) return;
+    setDeletingEventId(eventId);
+    const { error } = await supabase.from("events").delete().eq("id", eventId);
+    if (error) {
+      notify("error", error.message || "Could not delete event.");
+      setDeletingEventId(null);
+      return;
+    }
+    notify("success", "Event deleted.");
+    setAttendanceMap((prev) => {
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+    await load();
+    setDeletingEventId(null);
+  }
+
   async function promote(memberId) {
     if (promotingId === memberId) return;
     setPromotingId(memberId);
@@ -746,7 +848,10 @@ function ClubAdminPage() {
     const previous = attendanceMap[eventId] || "maybe";
     setUpdatingAttendanceId(eventId);
     setAttendanceMap((prev) => ({ ...prev, [eventId]: status }));
-    const { error } = await supabase.from("attendance").upsert({ user_id: session.user.id, event_id: eventId, status });
+    const { error } = await supabase.from("attendance").upsert(
+      { user_id: session.user.id, event_id: eventId, status },
+      { onConflict: "user_id,event_id" }
+    );
     if (error) {
       setAttendanceMap((prev) => ({ ...prev, [eventId]: previous }));
       notify("error", error.message || "Could not update attendance.");
@@ -787,7 +892,7 @@ function ClubAdminPage() {
             <h3>Manage People</h3>
             {members.map((m) => (
               <div key={m.id} className="row">
-                <span>{m.user?.email || m.user_id} ({m.role})</span>
+                <span>{m.user?.username || m.user?.email || m.user_id} ({m.role})</span>
                 {m.role !== "admin" && (
                   <button className="btn secondary" onClick={() => promote(m.id)} disabled={promotingId === m.id}>
                     {promotingId === m.id ? "Promoting..." : "Make admin"}
@@ -801,6 +906,16 @@ function ClubAdminPage() {
         <h3>Events and meetings</h3>
         {events.map((event) => (
           <div key={event.id} className="card small">
+            <div className="row event-card-actions">
+              <button
+                type="button"
+                className="btn danger"
+                onClick={() => deleteEvent(event.id)}
+                disabled={deletingEventId === event.id || updatingEventId === event.id}
+              >
+                {deletingEventId === event.id ? "Deleting..." : "Delete"}
+              </button>
+            </div>
             <label>Name<input value={event.name} onChange={(e) => setEvents((prev) => prev.map((ev) => ev.id === event.id ? { ...ev, name: e.target.value } : ev))} onBlur={() => updateEvent(event.id, { name: event.name })} disabled={updatingEventId === event.id} /></label>
             <label>Date<input type="datetime-local" value={toLocalDateTimeInput(event.date)} onChange={(e) => updateEvent(event.id, { date: new Date(e.target.value).toISOString() })} disabled={updatingEventId === event.id} /></label>
             <label>Location<input value={event.location} onChange={(e) => setEvents((prev) => prev.map((ev) => ev.id === event.id ? { ...ev, location: e.target.value } : ev))} onBlur={() => updateEvent(event.id, { location: event.location })} disabled={updatingEventId === event.id} /></label>

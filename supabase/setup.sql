@@ -14,9 +14,18 @@ create table if not exists public.schools (
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
+  username text,
   school_id uuid references public.schools(id),
   grade integer check (grade between 1 and 12)
 );
+
+-- Existing projects: add username if missing
+alter table public.users add column if not exists username text;
+
+-- Unique display names (case-insensitive, ignores surrounding spaces)
+create unique index if not exists users_username_lower_unique
+  on public.users (lower(trim(username)))
+  where username is not null and length(trim(username)) > 0;
 
 create table if not exists public.clubs (
   id uuid primary key default gen_random_uuid(),
@@ -119,6 +128,9 @@ as $$
   );
 $$;
 
+grant execute on function public.is_club_admin(uuid) to authenticated, anon;
+grant execute on function public.is_club_member(uuid) to authenticated, anon;
+
 -- Schools: authenticated users can read schools.
 drop policy if exists "read schools" on public.schools;
 create policy "read schools" on public.schools
@@ -147,6 +159,20 @@ create policy "users self update" on public.users
 for update to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
+
+-- Let members/admins see basic profile of people in the same club (for roster UI).
+drop policy if exists "users club peer read" on public.users;
+create policy "users club peer read" on public.users
+for select to authenticated
+using (
+  exists (
+    select 1
+    from public.memberships m_self
+    join public.memberships m_peer on m_self.club_id = m_peer.club_id
+    where m_self.user_id = auth.uid()
+      and m_peer.user_id = users.id
+  )
+);
 
 -- Clubs: members can read; admins can insert/update.
 drop policy if exists "clubs member read" on public.clubs;
@@ -201,6 +227,11 @@ create policy "events admin update" on public.events
 for update to authenticated
 using (public.is_club_admin(club_id))
 with check (public.is_club_admin(club_id));
+
+drop policy if exists "events admin delete" on public.events;
+create policy "events admin delete" on public.events
+for delete to authenticated
+using (public.is_club_admin(club_id));
 
 -- Attendance: users can only control their own attendance.
 drop policy if exists "attendance self read" on public.attendance;

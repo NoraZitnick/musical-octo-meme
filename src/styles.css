@@ -89,6 +89,21 @@ body {
   background: #4b5563;
 }
 
+.btn.danger {
+  background: #b91c1c;
+}
+
+.btn.danger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.event-card-actions {
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
 .form {
   display: grid;
   gap: 0.6rem;
@@ -119,7 +134,7 @@ textarea {
 
 .card-topbar {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
   margin-bottom: 0.5rem;
 }
 
@@ -260,4 +275,41 @@ textarea {
   to {
     transform: rotate(360deg);
   }
+}
+
+.profile-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  color: #374151;
+}
+
+.profile-hint-btn {
+  margin: 0;
+}
+
+.club-header {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.club-header h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.65rem;
+}
+
+.club-description {
+  margin: 0;
+  line-height: 1.6;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.section-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1rem;
+  color: #374151;
 }
