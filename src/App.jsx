@@ -381,6 +381,15 @@ function CreateClubPage() {
     e.preventDefault();
     if (creatingClub) return;
     setCreatingClub(true);
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !authData?.user?.id) {
+      notify("error", "Your session expired. Please log in again.");
+      setCreatingClub(false);
+      navigate("/login?mode=login");
+      return;
+    }
+    const currentUserId = authData.user.id;
+
     const { data: club, error: clubErr } = await supabase
       .from("clubs")
       .insert({
@@ -388,7 +397,7 @@ function CreateClubPage() {
         description: form.description,
         meeting_times: form.meeting_times,
         school_id: form.school_id,
-        created_by: session.user.id,
+        created_by: currentUserId,
       })
       .select("id")
       .single();
@@ -399,7 +408,7 @@ function CreateClubPage() {
     }
 
     const { error: membershipErr } = await supabase.from("memberships").insert({
-      user_id: session.user.id,
+      user_id: currentUserId,
       club_id: club.id,
       role: "admin",
     });
